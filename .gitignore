@@ -1,3 +1,4 @@
 *.flock
 *.bak
 /db
+/output_files
