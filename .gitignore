@@ -1,2 +1,3 @@
 *.flock
 *.bak
+/db
