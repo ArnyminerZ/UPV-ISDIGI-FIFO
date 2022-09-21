@@ -4,3 +4,6 @@
 /output_files
 /incremental_db
 /simulation
+
+# Ignore simulation log files
+*_simulation.rpt
