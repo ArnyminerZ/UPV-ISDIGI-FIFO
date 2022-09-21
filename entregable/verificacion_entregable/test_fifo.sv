@@ -42,7 +42,7 @@ task write;
 begin
   WRITE = 1'b1;                      // Habilitamos la escritura
   DATA_IN <= value;                  // Escribimos el valor dado
-  repeat(1) @(negedge CLOCK);        // Esperamos un ciclo de reloj
+  repeat(3) @(negedge CLOCK);        // Esperamos un ciclo de reloj
   WRITE = 1'b0;                      // Reiniciamos la flag de escritura
 end
 endtask
@@ -64,9 +64,10 @@ begin
   READ = 0;
   WRITE = 0;
   RESET_N = 1;
+  CLEAR_N = 1;
   DATA_IN = 0;
 
-  $display("Reiniciando módulo...");
+  $display("Reiniciando modulo...");
   repeat(1) @(negedge CLOCK);        // Esperamos un ciclo de reloj
   RESET_N = 0;                       // Reiniciamos
   repeat(1) @(negedge CLOCK);        // Esperamos otro ciclo
@@ -107,6 +108,8 @@ begin
   repeat(10) @(negedge CLOCK); // Separamos la tarea 10 ciclos
 
   write(11);                   // Escribimos el valor 11 en la memoria
+  repeat(4) @(negedge CLOCK);  // Esperamos 4 ciclos de reloj
+
   if (USE_DW == 5'd1)          // Comprobamos que el contador de uso se ha incrementado
     $display("ESCRITURA: OK (USE_DW)");
   else
@@ -128,6 +131,7 @@ initial begin
   escritura();
 end
 
+// * Genera la señal de reloj con un periodo igual al parámetro T
 always
 begin
   #(T/2) CLOCK <= ~CLOCK;
