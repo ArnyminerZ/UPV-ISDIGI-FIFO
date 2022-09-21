@@ -114,25 +114,33 @@ endtask
 task escritura;
 begin
   bit [7:0] bits;              // Declaramos la variable bits para guardar el valor de lectura
-  bit [7:0] value;                   // Declaramos la variable que guardará el valor a escribir
+  bit [7:0] value;             // Declaramos la variable que guardará el valor a escribir
+  bit [4:0] used;              // Declaramos la variable que guarda el valor de USE_DW al principio de la tarea
   repeat(10) @(negedge CLOCK); // Separamos la tarea 10 ciclos
 
+  used = USE_DW;               // Guardamos el valor de USE_DW
   value = aleatorio(2^8);      // Generamos un número aleatorio de 8 bits
   $display("Se va a escribir el valor", value);
 
   write(value);                   // Escribimos el valor 11 en la memoria
   repeat(4) @(negedge CLOCK);  // Esperamos 4 ciclos de reloj
 
-  if (USE_DW == 5'd1)          // Comprobamos que el contador de uso se ha incrementado
-    $display("ESCRITURA: OK (USE_DW)");
+  if (USE_DW == (used + 1))          // Comprobamos que el contador de uso se ha incrementado
+    $display("ESCRITURA: OK (USE_DW+)");
   else
-    $error("ESCRITURA: FAIL - El contador de uso deberia estar a 1. USE_DW =", USE_DW);
+    $error("ESCRITURA: FAIL - El contador de uso deberia estar a", used + 1, ". USE_DW =", USE_DW);
 
   read(bits);                  // Leemos el valor de la memoria
   if (bits == value)           // Comprobamos que el valor leído es el correcto
     $display("ESCRITURA: OK (READ)");
   else
     $error("ESCRITURA: FAIL - El valor leido no es igual al escrito. bits =", bits);
+    
+  if (USE_DW == used)          // Comprobamos que el contador de uso se ha reducido
+    $display("ESCRITURA: OK (USE_DW-)");
+  else
+    $error("ESCRITURA: FAIL - El contador de uso deberia estar a", used, ". USE_DW =", USE_DW);
+
 end
 endtask
 
