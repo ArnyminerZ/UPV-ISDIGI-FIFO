@@ -17,12 +17,15 @@ fifo #(
 )(
   // Entradas
   input CLOCK, RESET_N, READ, WRITE, CLEAR_N, // Input flags
-  input [7:0] DATA_IN,              // Input data
+  input [7:0] DATA_IN,                        // Input data
 
   // Salidas
-  output logic [7:0] DATA_OUT,      // Output data
-  output logic F_FULL_N, F_EMPTY_N,              // Output flags
-  output logic [4:0] USE_DW            // Usage flag
+  output logic [7:0] DATA_OUT,                // Output data
+  output logic F_FULL_N, F_EMPTY_N,           // Output flags
+  output logic [4:0] USE_DW,                  // Usage flag
+
+  // TODO: Remove temporal output
+  output reg [1:0] state, nextstate
 );
 
 // Bus interno de almacenaje de dirección de lectura y escritura
@@ -37,7 +40,7 @@ reg [7:0] DATA_OUT_RAM, DATA_OUT_INTERNAL;
 reg cp_ram; // Indica que se debe usar el valor de la RAM
 
 // -- ESTADOS MÁQUINA --
-reg [1:0] state, nextstate;
+// output reg [1:0] state, nextstate; // TODO: Remove temporal output
 
 // Declaración del módulo de memoria
 ram_dp #(.mem_depth(32), .size(8))
