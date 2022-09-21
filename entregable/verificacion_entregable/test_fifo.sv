@@ -15,6 +15,7 @@ reg [7:0] DATA_IN;
 wire [7:0] DATA_OUT;
 wire F_FULL_N, F_EMPTY_N;
 wire [4:0] USE_DW;
+wire [1:0] state, nextstate; // TODO: Remove temporal output
 
 fifo modulo_fifo(
     .CLOCK(CLOCK),
@@ -25,7 +26,10 @@ fifo modulo_fifo(
     .DATA_OUT(DATA_OUT),
     .F_FULL_N(F_FULL_N),
     .F_EMPTY_N(F_EMPTY_N),
-    .USE_DW(USE_DW)
+    .USE_DW(USE_DW),
+    // TODO: Remove temporal output
+    .state(state),
+    .nextstate(nextstate)
 );
 
 `ifdef VERIFICAR
@@ -56,6 +60,11 @@ begin
   READ = 1'b0;                       // Reiniciamos la flag de lectura
 end
 endtask
+
+// * Genera un número aleatorio entre 0 y max
+function int aleatorio(int max);
+  return {$random} % max;
+endfunction
 
 // ! -- TAREAS -- !
 task reset;
@@ -105,9 +114,13 @@ endtask
 task escritura;
 begin
   bit [7:0] bits;              // Declaramos la variable bits para guardar el valor de lectura
+  bit [7:0] value;                   // Declaramos la variable que guardará el valor a escribir
   repeat(10) @(negedge CLOCK); // Separamos la tarea 10 ciclos
 
-  write(11);                   // Escribimos el valor 11 en la memoria
+  value = aleatorio(2^8);      // Generamos un número aleatorio de 8 bits
+  $display("Se va a escribir el valor", value);
+
+  write(value);                   // Escribimos el valor 11 en la memoria
   repeat(4) @(negedge CLOCK);  // Esperamos 4 ciclos de reloj
 
   if (USE_DW == 5'd1)          // Comprobamos que el contador de uso se ha incrementado
@@ -116,7 +129,7 @@ begin
     $error("ESCRITURA: FAIL - El contador de uso deberia estar a 1. USE_DW =", USE_DW);
 
   read(bits);                  // Leemos el valor de la memoria
-  if (bits == 8'd11)           // Comprobamos que el valor leído es el correcto
+  if (bits == value)           // Comprobamos que el valor leído es el correcto
     $display("ESCRITURA: OK (READ)");
   else
     $error("ESCRITURA: FAIL - El valor leido no es igual al escrito. bits =", bits);
