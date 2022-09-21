@@ -110,7 +110,7 @@ end
 
 // ! -- DATA PATH -- !
 // State machine
-always @(state)
+always @(state, posedge READ, posedge WRITE)
 begin
   case (state)
     st_reset:
