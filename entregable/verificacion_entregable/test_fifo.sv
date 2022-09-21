@@ -63,7 +63,7 @@ endtask
 
 // * Genera un número aleatorio entre 0 y max
 function int aleatorio(int max);
-  return {$random} % max;
+  return {$random} %max;
 endfunction
 
 // ! -- TAREAS -- !
