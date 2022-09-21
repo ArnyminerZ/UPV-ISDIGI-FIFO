@@ -28,7 +28,7 @@ fifo #(
 reg [7:0] waddr, raddr; // aka countw, countr
 
 reg [7:0] DATA_OUT_RAM, DATA_OUT_INTERNAL;
-reg cp_ram;
+reg cp_ram; // Indica que se debe usar el valor de la RAM
 
 // -- ESTADOS MÁQUINA --
 reg [1:0] state, nextstate;
@@ -108,7 +108,8 @@ begin
       begin
         if (READ == 1'b1)
         begin
-          DATA_OUT <= DATA_IN;
+          cp_ram <= 0;
+          DATA_OUT_INTERNAL <= DATA_IN;
         end
         else
         begin
@@ -174,8 +175,8 @@ begin
     // Should not happen
     end
   endcase
-
-  assign DATA_OUT = cp_ram ? DATA_OUT_RAM : DATA_OUT_INTERNAL;
 end
+
+assign DATA_OUT = cp_ram ? DATA_OUT_RAM : DATA_OUT_INTERNAL;
 
 endmodule
