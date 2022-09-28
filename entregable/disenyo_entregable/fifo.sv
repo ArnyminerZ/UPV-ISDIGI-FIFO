@@ -10,10 +10,10 @@
 module
   
 fifo #(
-  parameter [1:0] st_empty = 1'd0,
-  parameter [1:0] st_full  = 1'd1,
-  parameter [1:0] st_other = 1'd2,
-  parameter [1:0] st_reset = 1'd3
+  parameter [1:0] st_empty = 2'd0,
+  parameter [1:0] st_full  = 2'd1,
+  parameter [1:0] st_other = 2'd2,
+  parameter [1:0] st_reset = 2'd3
 )(
   // Entradas
   input CLOCK, RESET_N, READ, WRITE, CLEAR_N, // Input flags
@@ -25,178 +25,185 @@ fifo #(
   output logic [4:0] USE_DW,                  // Usage flag
 
   // TODO: Remove temporal output
-  output reg [1:0] state, nextstate
+  output reg [1:0] state, nextstate,
+  output reg cp_ram,
+  // output reg [7:0] addr, addr,
+  output reg [4:0] addr,
+  output logic [7:0] DATA_OUT_RAM, DATA_OUT_INTERNAL,
+  output logic [7:0] mem [31:0],
+  output logic [7:0] DATA_IN_RAM
 );
 
 // Bus interno de almacenaje de dirección de lectura y escritura
-reg [7:0] waddr, raddr; // aka countw, countr
+// reg [7:0] addr, addr; // aka countw, countr
 
-reg [7:0] DATA_OUT_RAM, DATA_OUT_INTERNAL;
+// logic [7:0] DATA_OUT_RAM, DATA_OUT_INTERNAL;
+// logic [7:0] DATA_IN_RAM;
 
 // Se usa esta flag ya que la RAM actualiza el valor de salida, en este
 // caso DATA_OUT_RAM. Cuando este valor se debe escribir en la salida,
 // se actualizará cp_ram a 1, para indicar que el valor de la salida
 // debe ser DATA_OUT_RAM y no DATA_OUT_INTERNAL
-reg cp_ram; // Indica que se debe usar el valor de la RAM
+// TODO: Remove temporal output
+// reg cp_ram; // Indica que se debe usar el valor de la RAM
 
 // -- ESTADOS MÁQUINA --
 // output reg [1:0] state, nextstate; // TODO: Remove temporal output
 
 // Declaración del módulo de memoria
-ram_dp #(.mem_depth(32), .size(8))
-RAM (
-  .data_in(DATA_IN),      // Datos de entrada
+ram_dp RAM (
+  .data_in(DATA_IN_RAM),      // Datos de entrada
   .wren(WRITE),           // Flag de escritura
   .rden(READ),            // Flag de lectura
   .clock(CLOCK),          // Señal de reloj
-  .wraddress(waddr),      // Dirección de escritura
-  .rdaddress(raddr),      // Dirección de lectura
-  .data_out(DATA_OUT_RAM) // Salida de datos
+  .wraddress(addr),       // Dirección de escritura
+  .rdaddress(addr),       // Dirección de lectura
+  .data_out(DATA_OUT_RAM),// Salida de datos
+  .mem(mem)
 );
 
+// ! --  ----------  -- !
 // ! -- CONTROL PATH -- !
+// ! --  ----------  -- !
 // El always de transiciones de estado se controla por el reloj
-always @(posedge CLOCK, negedge RESET_N, negedge CLEAR_N)
+always @(negedge CLOCK, negedge RESET_N, negedge CLEAR_N)
 begin
-  if (!RESET_N || !CLEAR_N)
-    state <= st_reset;
-  else
-    state <= nextstate;
+  if (!RESET_N || !CLEAR_N)               // * Si se activan las entradas de clear o reset
+    state <= st_reset;                    // Pon la maquina de estados en reset
+  else                                    // * De lo contrario
+    state <= nextstate;                   // Copia "el siguiente estado" al actual
 end
 
-always @(READ, WRITE, state, USE_DW)
+always @(READ, WRITE, state)
 begin
   case (state)
-    st_empty:
-    if (WRITE == 1'b1)
-      if (READ == 1'b1)
-        nextstate <= st_empty;
-      else
-        nextstate <= st_other;
-    else
-      nextstate <= st_empty;
+    st_empty:                             // * La máquina de estados está en "vacío"
+    if (WRITE == 1'b1)                    // * Si se va a escribir
+      if (READ == 1'b1)                   // * Y también leer
+        nextstate <= st_empty;            // La máquina va a seguir estando vacía
+      else                                // * Si sólo se quiere escribir
+        nextstate <= st_other;            // La máquina no va a estar ni llena ni vacía
+    else                                  // * Si no se va a realizar ninguna acción
+      nextstate <= st_empty;              // La máquina va a seguir estando vacía
     
-    st_other:
-    if (WRITE == 1'b1)
-      if (READ == 1'b1)
-        nextstate <= st_other;
-      else if (USE_DW == 5'd31)
-        nextstate <= st_full;
-      else
-        nextstate <= st_other;
+    st_other:                             // * Si la máquina no está ni llena ni vacía
+    if (WRITE == 1'b1)                    // * Se quiere escribir
+      if (READ == 1'b1)                   // * Y también leer
+        nextstate <= st_other;            // La máquina va a seguir estando ni llena ni vacía
+      else if (USE_DW == 5'd31)           // * Si no se quiere leer, y la memoria se ha llenado
+        nextstate <= st_full;             // La máquina va a estar llena
+      else                                // * Si sólo se quiere escribir, y la memoria no se ha llenado aún
+        nextstate <= st_other;            // La máquina va a seguir estando ni llena ni vacía
     else
-      // if (READ == 1'b1)
-      //   if (USE_DW == 5'd1)
-      //     nextstate <= st_empty;
-      //   else
-      //     nextstate <= st_other;
-      // else
-      //   nextstate <= st_other;
-      if (READ == 1'b1 && USE_DW == 5'd1)
-        nextstate <= st_empty;
-      else
-        nextstate <= st_other;
+      if (READ == 1'b1 && USE_DW == 5'd1) // * Si no se quiere escribir, pero sí leer, y la memoria sólo tiene un elemento
+        nextstate <= st_empty;            // La máquina va a estar vacía
+      else                                // * Si no se quiere leer ni escribir
+        nextstate <= st_other;            // La máquina va a seguir estando ni llena ni vacía
     
-    st_full:
-    if (WRITE == 1'b1 || READ == 1'b0)
-      nextstate <= st_full;
-    else
-      nextstate <= st_other;
+    st_full:                              // * Si la máquina está llena
+    if (READ == 1'b1 && WRITE == 1'b0)    // * Si se quiere leer pero no escribir
+      nextstate <= st_other;              // La máquina no va a estar ni llena ni vacía
+    else                                  // * Si no se va a leer
+      nextstate <= st_full;               // La máquina va a seguir estando llena
 
-    st_reset:
-      nextstate <= st_empty;
+    st_reset:                             // * Si se ha reiniciado el sistema
+      nextstate <= st_empty;              // La máquina va a estar vacía
   endcase
 end
 
+// ! --  -------  -- !
 // ! -- DATA PATH -- !
+// ! --  -------  -- !
 // State machine
-always @(state, posedge READ, posedge WRITE)
+always @(state, READ, WRITE, cp_ram)
 begin
   case (state)
     st_reset:
     begin
-      F_EMPTY_N <= 1'b0;         // Establecemos que la memoria está vacía
-      F_FULL_N  <= 1'b1;         // Establecemos que la memoria no está llena
-      cp_ram <= 1'b0;            // Reiniciamos la flag de copia de RAM
-      raddr <= 8'b0;             // Reiniciamos el contador del puntero de lectura
-      waddr <= 8'b0;             // Reiniciamos el contador del puntero de escritura
-      USE_DW <= 5'b0;            // Reiniciamos el contador de uso
-      DATA_OUT_INTERNAL <= 8'b0; // Reiniciamos la memoria de salida de datos
+      F_EMPTY_N <= 1'b0;                  // Establecemos que la memoria está vacía
+      F_FULL_N  <= 1'b1;                  // Establecemos que la memoria no está llena
+      cp_ram <= 1'b0;                     // Reiniciamos la flag de copia de RAM
+      addr <= 5'b0;                       // Reiniciamos el contador del puntero de lectura
+      USE_DW <= 5'b0;                     // Reiniciamos el contador de uso
+      DATA_OUT_INTERNAL <= 8'b0;          // Reiniciamos la memoria de salida de datos
     end
 
     st_empty:
     begin
-      F_EMPTY_N <= 0;
-      F_FULL_N  <= 1;
-      if (WRITE == 1'b1)
+      F_EMPTY_N <= 0;                     // Está vacío
+      F_FULL_N  <= 1;                     // No está lleno
+      if (WRITE == 1'b1)                  // * Sólo realizar acciones si se va a escribir
       begin
-        if (READ == 1'b1)
+        $display("> Writing on empty memory.");
+        if (READ == 1'b1)                 // * Si también se lee
         begin
-          cp_ram <= 0;
-          DATA_OUT_INTERNAL <= DATA_IN;
+          $display("> Moving value from input to output");
+          DATA_OUT_INTERNAL <= DATA_IN;   // Copia los datos desde la entrada a la salida
         end
-        else
+        else                              // * Si sólo se quiere escribir
         begin
-          waddr <= waddr+1;
-          USE_DW <= USE_DW+1;
-          // RAM[waddr] <= DATA_IN;
+          addr <= 0;                      // Mueve el puntero de dirección a la derecha
+          USE_DW <= USE_DW + 1;           // Aumenta el uso de memoria
+          DATA_IN_RAM <= DATA_IN;         // Copia los datos desde la RAM a la salida
+          $display("> Writing value to RAM. Address:", addr, ". Value:", DATA_IN_RAM);
         end
       end
     end
+
     st_other:
     begin
-      F_EMPTY_N <= 1;
-      F_FULL_N  <= 1;
-      case ({READ, WRITE})
-      2'b11:
+      F_EMPTY_N <= 1;                     // No está vacío
+      F_FULL_N  <= 1;                     // No está lleno
+      case ({WRITE, READ})
+      2'b11:                              // * Si se va a leer y a escribir
       begin
-        raddr <= raddr + 1;
-        waddr <= waddr + 1;
-        // DATA_OUT <= RAM[raddr];
-        cp_ram <= 1; // Block write
-        // RAM[waddr] <= DATA_IN;
+        DATA_IN_RAM <= DATA_IN;           // Copia los datos de entrada a la RAM
+        $display("> Copying data from input to output. Value:", DATA_IN_RAM);
       end
-      2'b10:
+      2'b10:                              // * Si sólo se va a escribir
       begin
-        waddr <= waddr + 1;
-        USE_DW <= USE_DW+1;
-        // RAM[waddr] <= DATA_IN;
+        addr <= addr + 1;                 // Mueve el puntero de dirección a la derecha
+        USE_DW <= USE_DW + 1;             // Incrementa el uso de memoria
+        DATA_IN_RAM <= DATA_IN;           // Copia los datos de entrada a la RAM
+        $display("> Writing data to RAM. Address:", addr, ". Value:", DATA_IN_RAM);
       end
-      2'b01:
+      2'b01:                              // * Si sólo se va a leer
       begin
-        raddr <= raddr + 1;
-        USE_DW <= USE_DW - 1;
-        // DATA_OUT <= RAM[raddr];
-        cp_ram <= 1; // Block write
+        USE_DW <= USE_DW - 1;             // Decrementa el uso de memoria
+        addr <= USE_DW - 1;               // Mueve el puntero de dirección a la izquierda
+        cp_ram = 1;                       // Assigna la salida desde la RAM
+        $display("> Reading from RAM. Address:", addr, ". Value:", DATA_IN_RAM);
+      end
+      default:
+      begin
+        // No realizar ninguna acción
       end
       endcase
     end
+
     st_full:
     begin
-      F_EMPTY_N <= 1;
-      F_FULL_N  <= 0;
-      if (READ == 1'b1)
+      F_EMPTY_N <= 1;                     // No está vacío
+      F_FULL_N  <= 0;                     // Está lleno
+      if (READ == 1'b1)                   // * Sólo realizar acciones si se va a leer
       begin
-        if (WRITE == 1'b1)
+        if (WRITE == 1'b1)                // * Si también se quiere escribir
         begin
-          raddr <= raddr + 1;
-          waddr <= waddr + 1;
-          // DATA_OUT <= RAM[raddr];
-          cp_ram <= 1; // Block write
-          // RAM[waddr] <= DATA_IN;
+          DATA_IN_RAM <= DATA_IN;         // Copia los datos de entrada a la RAM
+          $display("> Copying data from input to output. Value:", DATA_IN_RAM);
         end
-        else
+        else                              // * Si sólo se quiere leer
         begin
-          raddr <= raddr + 1;
-          USE_DW <= USE_DW - 1;
-          // DATA_OUT <= RAM[raddr];
-          cp_ram <= 1; // Block write
+          USE_DW <= USE_DW - 1;           // Decrementa el uso de memoria
+          addr <= addr - 1;               // Mueve el puntero de dirección a la izquierda
+          cp_ram = 1;                     // Asigna la salida desde la RAM
+          $display("> Reading from RAM. Address:", addr, ". Value:", DATA_IN_RAM);
         end
       end
     end
     default:
     begin
-    // Should not happen
+    // Should not happen, hereby unhandled states from the state machine
     end
   endcase
 end
