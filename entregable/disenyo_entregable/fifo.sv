@@ -25,10 +25,9 @@ fifo #(
   output logic [4:0] USE_DW,                  // Usage flag
 
   // TODO: Remove temporal output
-  output reg [1:0] state, nextstate,
-  output reg cp_ram,
-  // output reg [7:0] addr, addr,
-  output reg [4:0] addr,
+  output logic [1:0] state, nextstate,
+  output logic [4:0] countw, countr,
+  output logic cp_ram,
   output logic [7:0] DATA_OUT_RAM, DATA_OUT_INTERNAL,
   output logic [7:0] mem [31:0],
   output logic [7:0] DATA_IN_RAM
@@ -52,13 +51,13 @@ fifo #(
 
 // Declaración del módulo de memoria
 ram_dp RAM (
-  .data_in(DATA_IN_RAM),      // Datos de entrada
+  .data_in(DATA_IN_RAM),   // Datos de entrada
   .wren(WRITE),           // Flag de escritura
-  .rden(READ),            // Flag de lectura
-  .clock(CLOCK),          // Señal de reloj
-  .wraddress(addr),       // Dirección de escritura
-  .rdaddress(addr),       // Dirección de lectura
-  .data_out(DATA_OUT_RAM),// Salida de datos
+  .rden(READ),             // Flag de lectura
+  .clock(CLOCK),           // Señal de reloj
+  .wraddress(countw),        // Dirección de escritura
+  .rdaddress(countr),        // Dirección de lectura
+  .data_out(DATA_OUT_RAM), // Salida de datos
   .mem(mem)
 );
 
@@ -74,7 +73,7 @@ begin
     state <= nextstate;                   // Copia "el siguiente estado" al actual
 end
 
-always @(READ, WRITE, state)
+always @(READ, WRITE, state, USE_DW)
 begin
   case (state)
     st_empty:                             // * La máquina de estados está en "vacío"
@@ -123,7 +122,8 @@ begin
       F_EMPTY_N <= 1'b0;                  // Establecemos que la memoria está vacía
       F_FULL_N  <= 1'b1;                  // Establecemos que la memoria no está llena
       cp_ram <= 1'b0;                     // Reiniciamos la flag de copia de RAM
-      addr <= 5'b0;                       // Reiniciamos el contador del puntero de lectura
+      countr <= 5'b0;                     // Reiniciamos el contador del puntero de lectura
+      countw <= 5'b0;                     // Reiniciamos el contador del puntero de escritura
       USE_DW <= 5'b0;                     // Reiniciamos el contador de uso
       DATA_OUT_INTERNAL <= 8'b0;          // Reiniciamos la memoria de salida de datos
     end
@@ -142,10 +142,10 @@ begin
         end
         else                              // * Si sólo se quiere escribir
         begin
-          addr <= 0;                      // Mueve el puntero de dirección a la derecha
+          countw <= countw + 1;           // Mueve el puntero de dirección a la derecha
           USE_DW <= USE_DW + 1;           // Aumenta el uso de memoria
           DATA_IN_RAM <= DATA_IN;         // Copia los datos desde la RAM a la salida
-          $display("> Writing value to RAM. Address:", addr, ". Value:", DATA_IN_RAM);
+          $display("> Writing value to RAM. countw:", countw, ". Value:", DATA_IN);
         end
       end
     end
@@ -158,21 +158,21 @@ begin
       2'b11:                              // * Si se va a leer y a escribir
       begin
         DATA_IN_RAM <= DATA_IN;           // Copia los datos de entrada a la RAM
-        $display("> Copying data from input to output. Value:", DATA_IN_RAM);
+        $display("> Copying data from input to output. Value:", DATA_IN);
       end
       2'b10:                              // * Si sólo se va a escribir
       begin
-        addr <= addr + 1;                 // Mueve el puntero de dirección a la derecha
+        countw <= countw + 1;             // Mueve el puntero de dirección a la derecha
         USE_DW <= USE_DW + 1;             // Incrementa el uso de memoria
         DATA_IN_RAM <= DATA_IN;           // Copia los datos de entrada a la RAM
-        $display("> Writing data to RAM. Address:", addr, ". Value:", DATA_IN_RAM);
+        $display("> Writing data to RAM. countw:", countw, ". Value:", DATA_IN);
       end
       2'b01:                              // * Si sólo se va a leer
       begin
-        USE_DW <= USE_DW - 1;             // Decrementa el uso de memoria
-        addr <= USE_DW - 1;               // Mueve el puntero de dirección a la izquierda
+        // USE_DW <= USE_DW - 1;             // Decrementa el uso de memoria
+        countr <= countr + 1;             // Mueve el puntero de dirección a la izquierda
         cp_ram = 1;                       // Assigna la salida desde la RAM
-        $display("> Reading from RAM. Address:", addr, ". Value:", DATA_IN_RAM);
+        $display("> Reading from RAM. countr:", countr, ". Value:", DATA_IN_RAM);
       end
       default:
       begin
@@ -194,10 +194,10 @@ begin
         end
         else                              // * Si sólo se quiere leer
         begin
-          USE_DW <= USE_DW - 1;           // Decrementa el uso de memoria
-          addr <= addr - 1;               // Mueve el puntero de dirección a la izquierda
+          // USE_DW <= USE_DW - 1;           // Decrementa el uso de memoria
+          countr <= countr + 1;           // Mueve el puntero de dirección a la izquierda
           cp_ram = 1;                     // Asigna la salida desde la RAM
-          $display("> Reading from RAM. Address:", addr, ". Value:", DATA_IN_RAM);
+          $display("> Reading from RAM. countr:", countr, ". Value:", DATA_IN_RAM);
         end
       end
     end
