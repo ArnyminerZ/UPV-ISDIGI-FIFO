@@ -6,10 +6,11 @@ module ram_dp
     input wren,clock,rden,
     input [$clog2(mem_depth-1)-1:0] wraddress, 
     input [$clog2(mem_depth-1)-1:0] rdaddress,
-    output logic [size-1:0] data_out
+    output logic [size-1:0] data_out,
+    output logic [size-1:0] mem [mem_depth-1:0]
 );
 
-logic [size-1:0] mem [mem_depth-1:0];
+// logic [size-1:0] mem [mem_depth-1:0];
 
 always_ff @(posedge clock)
 begin

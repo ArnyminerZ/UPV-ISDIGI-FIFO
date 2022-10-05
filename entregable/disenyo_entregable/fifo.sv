@@ -134,10 +134,10 @@ begin
       F_FULL_N  <= 1;                     // No está lleno
       if (WRITE == 1'b1)                  // * Sólo realizar acciones si se va a escribir
       begin
-        $display("> Writing on empty memory.");
+        // $display("> Writing on empty memory.");
         if (READ == 1'b1)                 // * Si también se lee
         begin
-          $display("> Moving value from input to output");
+          // $display("> Moving value from input to output");
           DATA_OUT_INTERNAL <= DATA_IN;   // Copia los datos desde la entrada a la salida
         end
         else                              // * Si sólo se quiere escribir
@@ -145,7 +145,7 @@ begin
           countw <= countw + 1;           // Mueve el puntero de dirección a la derecha
           USE_DW <= USE_DW + 1;           // Aumenta el uso de memoria
           DATA_IN_RAM <= DATA_IN;         // Copia los datos desde la RAM a la salida
-          $display("> Writing value to RAM. countw:", countw, ". Value:", DATA_IN);
+          // $display("> Writing value to RAM. countw:", countw, ". Value:", DATA_IN);
         end
       end
     end
@@ -158,21 +158,20 @@ begin
       2'b11:                              // * Si se va a leer y a escribir
       begin
         DATA_IN_RAM <= DATA_IN;           // Copia los datos de entrada a la RAM
-        $display("> Copying data from input to output. Value:", DATA_IN);
+        // $display("> Copying data from input to output. Value:", DATA_IN);
       end
       2'b10:                              // * Si sólo se va a escribir
       begin
         countw <= countw + 1;             // Mueve el puntero de dirección a la derecha
         USE_DW <= USE_DW + 1;             // Incrementa el uso de memoria
         DATA_IN_RAM <= DATA_IN;           // Copia los datos de entrada a la RAM
-        $display("> Writing data to RAM. countw:", countw, ". Value:", DATA_IN);
+        // $display("> Writing data to RAM. countw:", countw, ". Value:", DATA_IN);
       end
       2'b01:                              // * Si sólo se va a leer
       begin
-        // USE_DW <= USE_DW - 1;             // Decrementa el uso de memoria
         countr <= countr + 1;             // Mueve el puntero de dirección a la izquierda
         cp_ram = 1;                       // Assigna la salida desde la RAM
-        $display("> Reading from RAM. countr:", countr, ". Value:", DATA_IN_RAM);
+        // $display("> Reading from RAM. countr:", countr, ". Value:", DATA_IN_RAM);
       end
       default:
       begin
@@ -190,14 +189,13 @@ begin
         if (WRITE == 1'b1)                // * Si también se quiere escribir
         begin
           DATA_IN_RAM <= DATA_IN;         // Copia los datos de entrada a la RAM
-          $display("> Copying data from input to output. Value:", DATA_IN_RAM);
+          // $display("> Copying data from input to output. Value:", DATA_IN_RAM);
         end
         else                              // * Si sólo se quiere leer
         begin
-          // USE_DW <= USE_DW - 1;           // Decrementa el uso de memoria
           countr <= countr + 1;           // Mueve el puntero de dirección a la izquierda
           cp_ram = 1;                     // Asigna la salida desde la RAM
-          $display("> Reading from RAM. countr:", countr, ". Value:", DATA_IN_RAM);
+          // $display("> Reading from RAM. countr:", countr, ". Value:", DATA_IN_RAM);
         end
       end
     end
